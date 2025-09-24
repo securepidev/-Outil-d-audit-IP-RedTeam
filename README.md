@@ -31,8 +31,7 @@ Cet outil est destiné exclusivement aux tests de pénétration autorisés, audi
 
 ```bash
 # Téléchargement
-wget -O run_analyse_ip_precheck.sh [URL_SCRIPT_1]
-wget -O analyse_ip_public_ameliore.sh [URL_SCRIPT_2]
+git clone [Lien de l'url github]
 
 # Permissions
 chmod +x *.sh

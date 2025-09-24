@@ -54,8 +54,11 @@ fi
 if [[ -z "$SECURITYTRAILS_API_KEY" ]]; then
   read -p "SecurityTrails API Key (Enter pour ignorer) : " SECURITYTRAILS_API_KEY
 fi
+if [[ -z "$ABUSEIPDB_API_KEY" ]]; then
+  read -p "AbuseIPDB API Key (Enter pour ignorer) : " ABUSEIPDB_API_KEY
+fi
 
-OUTDIR="redteam_audit_$(date +%Y%m%d_%H%M%S)_${IP//:/_}"
+OUTDIR="redteam_audit_$(date +%Y%m%d_%H%M%S)_${IP//./_}"
 mkdir -p "$OUTDIR"/{recon,vulnscan,enum,evasion,osint,logs}
 
 echo "[🎯] === AUDIT RED TEAM - IP : $IP ==="
@@ -73,14 +76,18 @@ function safe_run() {
   local cmd="$1"
   local output="$2"
   local description="$3"
-  
+  local status
+
   echo "[EXEC] $description" >> "$OUTDIR/logs/commands.log"
   echo "[CMD] $cmd" >> "$OUTDIR/logs/commands.log"
   
-  eval "$cmd" 2>&1 | tee "$output" || {
-    echo "[ERROR] Échec: $description" | tee -a "$OUTDIR/logs/errors.log"
+  eval "$cmd" 2>&1 | tee "$output"
+  status=${PIPESTATUS[0]}
+  
+  if test "${status}" -ne 0; then
+    echo "[ERROR] Échec: $description (code: ${status:-?})" | tee -a "$OUTDIR/logs/errors.log"
     return 1
-  }
+  fi
   return 0
 }
 
@@ -106,43 +113,52 @@ if command -v geoiplookup >/dev/null 2>&1; then
   safe_run "geoiplookup '$IP'" "$OUTDIR/recon/geoip.txt" "GeoIP lookup"
 fi
 
-# IP reputation gratuite
-safe_run "curl -s 'https://api.abuseipdb.com/api/v2/check?ipAddress=$IP' -H 'Key: YOUR_KEY_HERE' || echo 'AbuseIPDB: clé requise'" "$OUTDIR/osint/abuseipdb.json" "AbuseIPDB check"
+# IP reputation
+if [[ -n "$ABUSEIPDB_API_KEY" ]]; then
+  safe_run "curl -s 'https://api.abuseipdb.com/api/v2/check?ipAddress=$IP' -H 'Key: $ABUSEIPDB_API_KEY' | jq '.'" "$OUTDIR/osint/abuseipdb.json" "AbuseIPDB check"
+else
+  echo "[ℹ️] Clé API AbuseIPDB non fournie, scan ignoré."
+  echo '{"error": "AbuseIPDB: clé non fournie"}' > "$OUTDIR/osint/abuseipdb.json"
+fi
 
 # --- 4) Shodan ---
 etape "4) Shodan Intelligence" "Services exposés et vulnérabilités"
 if [[ -n "$SHODAN_API_KEY" ]]; then
-  safe_run "curl -s 'https://api.shodan.io/shodan/host/$IP?key=$SHODAN_API_KEY'" "$OUTDIR/osint/shodan.json" "Shodan lookup"
+  safe_run "curl -s 'https://api.shodan.io/shodan/host/$IP?key=$SHODAN_API_KEY' | jq '.'" "$OUTDIR/osint/shodan.json" "Shodan lookup"
   eval $CURL_DELAY
 else
-  echo "SHODAN_API_KEY non fourni" > "$OUTDIR/osint/shodan.txt"
+  echo "[ℹ️] Clé API Shodan non fournie, scan ignoré."
+  echo '{"error": "SHODAN_API_KEY non fourni"}' > "$OUTDIR/osint/shodan.json"
 fi
 
 # --- 5) VirusTotal ---
 etape "5) VirusTotal Reputation" "Réputation et détections malware"
 if [[ -n "$VT_API_KEY" ]]; then
-  safe_run "curl -s -H 'x-apikey: $VT_API_KEY' 'https://www.virustotal.com/api/v3/ip_addresses/$IP'" "$OUTDIR/osint/virustotal.json" "VirusTotal lookup"
+  safe_run "curl -s -H 'x-apikey: $VT_API_KEY' 'https://www.virustotal.com/api/v3/ip_addresses/$IP' | jq '.'" "$OUTDIR/osint/virustotal.json" "VirusTotal lookup"
   eval $CURL_DELAY
 else
-  echo "VT_API_KEY non fourni" > "$OUTDIR/osint/virustotal.txt"
+  echo "[ℹ️] Clé API VirusTotal non fournie, scan ignoré."
+  echo '{"error": "VT_API_KEY non fourni"}' > "$OUTDIR/osint/virustotal.json"
 fi
 
 # --- 6) Censys ---
 etape "6) Censys Intelligence" "Certificats SSL et services"
 if [[ -n "$CENSYS_API_ID" && -n "$CENSYS_API_SECRET" ]]; then
-  safe_run "curl -u '$CENSYS_API_ID:$CENSYS_API_SECRET' 'https://search.censys.io/api/v2/hosts/$IP'" "$OUTDIR/osint/censys.json" "Censys lookup"
+  safe_run "curl -s -u '$CENSYS_API_ID:$CENSYS_API_SECRET' 'https://search.censys.io/api/v2/hosts/$IP' | jq '.'" "$OUTDIR/osint/censys.json" "Censys lookup"
   eval $CURL_DELAY
 else
-  echo "Censys API non configuré" > "$OUTDIR/osint/censys.txt"
+  echo "[ℹ️] Clés API Censys non fournies, scan ignoré."
+  echo '{"error": "Censys API non configuré"}' > "$OUTDIR/osint/censys.json"
 fi
 
 # --- 7) SecurityTrails ---
 etape "7) SecurityTrails DNS History" "Historique DNS et sous-domaines"
 if [[ -n "$SECURITYTRAILS_API_KEY" ]]; then
-  safe_run "curl -s -H 'APIKEY: $SECURITYTRAILS_API_KEY' 'https://api.securitytrails.com/v1/ips/nearby/$IP'" "$OUTDIR/osint/securitytrails.json" "SecurityTrails lookup"
+  safe_run "curl -s -H 'APIKEY: $SECURITYTRAILS_API_KEY' 'https://api.securitytrails.com/v1/ips/nearby/$IP' | jq '.'" "$OUTDIR/osint/securitytrails.json" "SecurityTrails lookup"
   eval $CURL_DELAY
 else
-  echo "SecurityTrails API non configuré" > "$OUTDIR/osint/securitytrails.txt"
+  echo "[ℹ️] Clé API SecurityTrails non fournie, scan ignoré."
+  echo '{"error": "SecurityTrails API non configuré"}' > "$OUTDIR/osint/securitytrails.json"
 fi
 
 # --- PHASE 2: DÉCOUVERTE ACTIVE ---
@@ -160,7 +176,7 @@ fi
 
 # --- 9) Ping analysis ---
 etape "9) ICMP Analysis" "Réponse ICMP et fingerprinting OS"
-safe_run "ping -c 10 '$IP' | tee >(tail -1 > '$OUTDIR/recon/ping_stats.txt')" "$OUTDIR/recon/ping_analysis.txt" "Ping analysis"
+safe_run "ping -c 10 '$IP'" "$OUTDIR/recon/ping_analysis.txt" "Ping analysis"
 
 # --- 10) Nmap découverte des hôtes ---
 etape "10) Host Discovery" "Détection de l'hôte et services"
@@ -298,7 +314,12 @@ if command -v nmap >/dev/null 2>&1; then
   safe_run "nmap -Pn -p 443 --script ssl-heartbleed '$IP'" "$OUTDIR/vulnscan/heartbleed.txt" "Heartbleed test"
   
   # BlueKeep
-  safe_run "nmap -Pn -p 3389 --script rdp-vuln-ms12-020 '$IP'" "$OUTDIR/vulnscan/bluekeep.txt" "BlueKeep test"
+  if [ -f "/usr/share/nmap/scripts/rdp-vuln-cve2019-0708.nse" ]; then
+    safe_run "nmap -Pn -p 3389 --script rdp-vuln-cve2019-0708 '$IP'" "$OUTDIR/vulnscan/bluekeep.txt" "BlueKeep test"
+  else
+    echo "Script Nmap rdp-vuln-cve2019-0708.nse non trouvé." > "$OUTDIR/vulnscan/bluekeep.txt"
+    echo "[INFO] Script BlueKeep non trouvé, test ignoré. Exécutez 'sudo nmap --script-updatedb' pour le mettre à jour." | tee -a "$OUTDIR/logs/timeline.log"
+  fi
 fi
 
 # --- PHASE 6: TESTS D'ÉVASION (si activés) ---
@@ -416,4 +437,27 @@ etape "30) Executive Summary" "Synthèse exécutive des résultats"
 
 # --- 31) Export PDF si possible ---
 etape "31) PDF Generation" "Génération du rapport PDF"
-PDF_FILE="$OUTDIR/RedTeam_Audit_${IP//:
+PDF_FILE="$OUTDIR/RedTeam_Audit_${IP//./_}.pdf"
+MD_FILE="$OUTDIR/RAPPORT_EXECUTIF.md"
+
+if command -v pandoc >/dev/null 2>&1; then
+  echo "Génération du rapport PDF avec Pandoc..."
+  # Tente la conversion avec un template populaire (eisvogel), sinon utilise la méthode par défaut
+  pandoc "$MD_FILE" -o "$PDF_FILE" --from markdown --template eisvogel --listings --pdf-engine=xelatex &> /dev/null
+  if [ $? -ne 0 ]; then
+    # Essai sans template si le premier échoue
+    pandoc "$MD_FILE" -o "$PDF_FILE" --from markdown --pdf-engine=xelatex &> /dev/null
+  fi
+
+  if [ -f "$PDF_FILE" ]; then
+    echo "[✅] Rapport PDF généré : $PDF_FILE"
+  else
+    echo "[⚠️] Échec de la génération PDF. Pandoc ou une dépendance (xelatex) pourrait manquer."
+    echo "    Le rapport Markdown est disponible : $MD_FILE"
+  fi
+else
+  echo "[ℹ️] Pandoc non trouvé. Le rapport est disponible au format Markdown : $MD_FILE"
+fi
+
+echo -e "\n\n🎉 === AUDIT TERMINÉ === 🎉"
+echo "Les résultats complets sont dans le répertoire : $OUTDIR"

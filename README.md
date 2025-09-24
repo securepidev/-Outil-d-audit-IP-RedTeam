@@ -14,7 +14,6 @@ Suite d'audit de sécurité automatisée conçue pour les équipes Red Team et l
 ✅ **Ubuntu/Debian** (APT)  
 ✅ **Arch Linux** (Pacman)  
 ✅ **SUSE/openSUSE** (Zypper)  
-✅ **Alpine Linux** (APK)  
 
 L'outil détecte automatiquement votre distribution et installe les dépendances avec le bon gestionnaire de paquets.
 

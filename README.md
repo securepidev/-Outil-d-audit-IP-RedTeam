@@ -31,10 +31,10 @@ Cet outil est destiné exclusivement aux tests de pénétration autorisés, audi
 
 ```bash
 # 1. Cloner le dépôt
-git clone https://github.com/votre-username/redteam-ip-audit.git
+git clone [lien github]
 
 # 2. Accéder au dossier
-cd [Nouveaux dossier}
+cd [Nouveaux dossier]
 
 # 3. Rendre les scripts exécutables
 chmod +x run_analyse_ip_precheck.sh analyse_ip_public_ameliore.sh

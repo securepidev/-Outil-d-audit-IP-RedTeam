@@ -30,17 +30,21 @@ Cet outil est destiné exclusivement aux tests de pénétration autorisés, audi
 ## 🚀 Installation Rapide
 
 ```bash
-# Téléchargement
-git clone [Lien de l url github]
+# 1. Cloner le dépôt
+git clone https://github.com/votre-username/redteam-ip-audit.git
 
-# Permissions
-chmod +x *.sh
+# 2. Accéder au dossier
+cd redteam-ip-audit
 
-# Lancement avec installation automatique des dépendances
+# 3. Rendre les scripts exécutables
+chmod +x run_analyse_ip_precheck.sh analyse_ip_public_ameliore.sh
+
+# 4. Lancer l'outil
 ./run_analyse_ip_precheck.sh
 ```
 
-L'outil installe automatiquement toutes les dépendances selon votre distribution Linux.
+Le script `precheck` détectera automatiquement votre distribution Linux et installera toutes les dépendances nécessaires avant de lancer l'audit de sécurité.
+
 
 ---
 

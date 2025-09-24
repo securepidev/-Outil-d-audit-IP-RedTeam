@@ -34,7 +34,7 @@ Cet outil est destiné exclusivement aux tests de pénétration autorisés, audi
 git clone https://github.com/votre-username/redteam-ip-audit.git
 
 # 2. Accéder au dossier
-cd redteam-ip-audit
+cd [Nouveaux dossier}
 
 # 3. Rendre les scripts exécutables
 chmod +x run_analyse_ip_precheck.sh analyse_ip_public_ameliore.sh
